@@ -1,0 +1,265 @@
+// Hello :>
+// This is a simple git api wrapper for Node.js.
+// It provides a simple interface to interact with git repositories.
+// Nice thing is this has only 1 dependency which is *axios*.
+import * as tgitv3 from "./git.v3.types";
+import axios, { AxiosResponse, AxiosResponseHeaders } from "axios";
+
+const github = axios.create({
+  baseURL: "https://api.github.com",
+  headers: {
+    // Communicate via JSON
+    "Content-Type": "application/json",
+    // Accept JSON, specifically the github v3 api
+    Accept: "application/vnd.github.v3+json",
+    // The user agent that is used to identify the client us, the client
+    "User-Agent": "Project-Create-Git-API",
+  },
+
+  timeout: 10000, // 10 seconds timeout probably means github is down
+  timeoutErrorMessage: "Github: Request timed out",
+  validateStatus: (status) => {
+    return 0 < status && status < 600; // It is unusual to get a status code outside of this range
+    // Thats why we suspect that the request is tampered with
+  },
+
+  httpAgent: "Project-Create-Git-API",
+  httpsAgent: "Project-Create-Git-API",
+  maxRedirects: 0, // This means this is not github redirecting us to another url, probably third party
+  maxContentLength: 100 * 1024 * 1024, // 100MB
+  maxBodyLength: 100 * 1024 * 1024, // 100MB
+  decompress: true, // Decompress the response
+});
+
+interface GitHubWrapperApiError {
+  error: string;
+  fetch_status: number;
+  fetch_status_text: string;
+  fetch_url?: string;
+  fetch_headers: AxiosResponseHeaders;
+}
+class GitHubWrapperApiError {
+  constructor(apiError: GitHubWrapperApiError) {
+    this.error = apiError.error;
+    this.fetch_status = apiError.fetch_status;
+    this.fetch_status_text = apiError.fetch_status_text;
+    this.fetch_url = apiError.fetch_url;
+    this.fetch_headers = apiError.fetch_headers;
+  }
+
+  static fromResponse(response: AxiosResponse, errorMessage?: string) {
+    return new GitHubWrapperApiError({
+      error: errorMessage ?? response.statusText,
+      fetch_status: response.status,
+      fetch_status_text: response.statusText,
+      fetch_url: response.config.url,
+      fetch_headers: response.config.headers,
+    });
+  }
+
+  static [Symbol.hasInstance](inst: object): inst is GitHubWrapperApiError {
+    return "error" in inst;
+  }
+}
+type GitHubWrapperApiReturn<T> = Promise<T | GitHubWrapperApiError>;
+// The git api options, most will be needed for the header of the request
+interface GitAPIOptions {
+  // The token that git use for the Authorization header
+  authorizationToken?: string;
+  // username
+  username?: string;
+  // password
+  password?: string;
+}
+
+interface BranchOptions {
+  // The name of the parent repository
+  repositoryName: string;
+  options: GitAPIOptions;
+}
+class Branch implements tgitv3.GitHubBranch {
+  // The name of the branch
+  name: string;
+  protected: boolean;
+  protection: tgitv3.GitHubBranchProtection;
+  protection_url: string;
+  // The last commit of the branch
+  commit: tgitv3.GitHubCommit;
+
+  repositoryName: string;
+  options: GitAPIOptions;
+  constructor(base: tgitv3.GitHubBranch, options: BranchOptions) {
+    this.name = base.name;
+    this.protected = base.protected;
+    this.protection = base.protection;
+    this.protection_url = base.protection_url;
+    this.commit = base.commit;
+
+    // Branch class is an implementation of the GitHubBranch interface
+    // In reality, this is a wrapper on top of what git api returns
+
+    this.repositoryName = options.repositoryName;
+    this.options = options.options;
+  }
+
+  /**
+   * To actually get all the commits of the branch
+   * this method will fetch the commits from the git api
+   */
+  async getAllCommits(): Promise<tgitv3.GitHubCommit[]> {}
+}
+
+/**
+ * Base class for all git repositories
+ * This class is polymorphic, meaning that it can be used as a base class for all git repositories.
+ * It is not meant to be used directly.
+ */
+class Repository {
+  // The name of the repository
+  readonly name: string;
+  // The owner of the repository
+  readonly owner: string;
+  // The url of the repository
+  readonly url: string;
+  // The git api options
+  readonly options: GitAPIOptions;
+  constructor(
+    name: string,
+    owner: string,
+    url: string,
+    options: GitAPIOptions
+  ) {
+    this.name = name;
+    this.owner = owner;
+    this.url = url;
+    this.options = options;
+  }
+
+  // This method is used to build the url of the repository
+  /**
+   * Builds the url to the repository
+   */
+  getRepositoryUrl() {
+    return `/repos/${this.owner}/${this.name}`;
+  }
+
+  // This property is used to get the built url of the repository
+  get repositoryUrl() {
+    return this.getRepositoryUrl();
+  }
+
+  static fromRepository<
+    TCls extends new (
+      ...args: [string, string, string, GitAPIOptions]
+    ) => Repository
+  >(repository: Repository, cls: TCls): InstanceType<TCls> {
+    return new cls(
+      repository.name,
+      repository.owner,
+      repository.url,
+      repository.options
+    ) as InstanceType<TCls>;
+  }
+}
+
+// This class is returned when the .repository() method is called
+// it is used to only reading the repository
+// use the WritableRepository class to be able to push to the repository
+class ReadonlyRepository extends Repository {
+  constructor(
+    name: string,
+    owner: string,
+    url: string,
+    options: GitAPIOptions
+  ) {
+    super(name, owner, url, options);
+  }
+  // This method will be used to get the repository information
+  async getRepositoryInfo(): GitHubWrapperApiReturn<tgitv3.GitHubRepository> {
+    {
+      // The url of the repository
+      const url = `/repos/${this.owner}/${this.name}`;
+      // The headers of the request
+      const headers = {
+        Accept: "application/vnd.github.v3+json",
+      };
+      const response = await github.get(url, {
+        headers: headers,
+      });
+
+      // Check if the response is ok
+
+      if (response.status === 200) {
+        // The response is ok
+        // The response is a GitHubRepository object
+        const repository = response.data as tgitv3.GitHubRepository;
+        return repository;
+      }
+
+      if (response.status === 404) {
+        return {
+          error: "Repository not found",
+          fetch_status: response.status,
+          fetch_status_text: response.statusText,
+          fetch_url: response.config.url,
+          fetch_headers: response.config.headers,
+        };
+      }
+
+      return {
+        error: "Unknown error",
+        fetch_status: response.status,
+        fetch_status_text: response.statusText,
+        fetch_url: response.config.url,
+        fetch_headers: response.config.headers,
+      };
+    }
+  }
+
+  async getBranch(name: string): GitHubWrapperApiReturn<tgitv3.GitHubBranch> {
+    const url = `/repos/${this.owner}/${this.name}/branches/${name}`;
+    const headers = {};
+    const response = await github.get(url, {
+      headers,
+    });
+
+    if (response.status === 200) {
+      return response.data as tgitv3.GitHubBranch;
+    }
+
+    if (response.status === 404) {
+      return GitHubWrapperApiError.fromResponse(response, "Branch Not Found!");
+    }
+
+    return GitHubWrapperApiError.fromResponse(response);
+  }
+  async getDefaultBranch(): GitHubWrapperApiReturn<tgitv3.GitHubBranch> {
+    const repositoryData = await this.getRepositoryInfo();
+
+    if (repositoryData instanceof GitHubWrapperApiError) {
+      return repositoryData;
+    }
+
+    const defaultBranch = await this.getBranch(repositoryData.default_branch);
+
+    return defaultBranch; // it will be the same
+  }
+
+  async getCloneUrl(): GitHubWrapperApiReturn<string> {
+    const repositoryData = await this.getRepositoryInfo();
+    if (repositoryData instanceof GitHubWrapperApiError) {
+      return repositoryData;
+    }
+
+    return repositoryData;
+  }
+}
+
+// This class is used to write to the repository
+class WritableRepository extends Repository {
+  readableRepository: ReadonlyRepository;
+  constructor(repo: ReadonlyRepository) {
+    super(repo.name, repo.owner, repo.url, repo.options);
+    this.readableRepository = repo;
+  }
+}

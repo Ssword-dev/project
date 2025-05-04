@@ -1,0 +1,20 @@
+{
+  // List of extensions recommended for this workspace
+  "recommendations": [
+    // Formatter
+    "esbenp.prettier-vscode",
+    // Editor Config Integration
+    "EditorConfig.EditorConfig",
+    // Auto Imports
+    "christian-kohler.npm-intellisense",
+    // Live Code Quality Feedback
+    "dbaeumer.vscode-eslint",
+    // Testing
+    "Orta.vscode-jest",
+    // Themes
+    "sdras.night-owl", // If you gonna read my code, go use a theme that wont make your eyes tired (:
+    // Optionals:
+    // DotENV support
+    "mikestead.dotenv"
+  ],
+}

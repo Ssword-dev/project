@@ -1,0 +1,20 @@
+{
+  // This file is used to configure the project creation process.
+  // It is a JSONC file, which means it can contain comments.
+  // Thank the author of strip-json-comments for this feature.
+  // The $schema property is explicitly defined in the json schema to allow
+  // for better intellisense in editors like VSCode.
+  // The schema is located in the NodeJS directory of the project.
+  "$schema": "./NodeJS/json-schema/config.schema.json",
+  "global-startup": "./NodeJS/defaults/global-startup.js",
+  "global-teardown": "./NodeJS/defaults/global-teardown.js",
+  "global-variables": {
+    "template-version": "1.0.0"
+  },
+  "project-name-regex": "^([a-zA-Z0-9-_]+)$",
+  "remove-on-failure": true,
+  "template-directory": "./project-templates",
+  "user-preferences": {
+    "project-priority": false
+  }
+}

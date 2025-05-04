@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "If you want to add a new property, use the user-preferences property instead",
+  "description": "This is the configuration file for the template engine. It specifies the template directory, the JSON file must be in the parent of the Directory of this repository.\nThe template directory must contain a template.json file, which specifies the template to be used.\nThe template.json file must be in the same directory as the config.json file.\nThe config.json file must be in the same directory as the template.json file.",
+  "title": "TemplateConfig",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The URL of the JSON schema for this configuration file"
+    },
+    "project-name-regex": {
+      "type": "string",
+      "description": "A regex used for verifying if a project name is valid or not"
+    },
+    "template-directory": {
+      "type": "string",
+      "description": "Specifies the template directory relative to the config file"
+    },
+    "remove-on-failure": {
+      "type": "boolean",
+      "description": "Controls whether to remove the directory on unsuccessful exit"
+    },
+    "global-startup": {
+      "type": "string",
+      "description": "Path to a module that runs before any template is loaded"
+    },
+    "global-teardown": {
+      "type": "string",
+      "description": "Path to a module that runs after the template has finished creating"
+    },
+    "global-variables": {
+      "description": "A JSON file or object that passes variables into every template",
+      "anyOf": [{ "type": "string" }, { "type": "object" }]
+    },
+    "user-preferences": {
+      "type": "object",
+      "properties": {
+        "project-priority": {
+          "type": "boolean",
+          "description": "Controls whether to overwrite existing folders with the same project name\nalso will skip the overwrite prompt if true"
+        }
+      },
+      "required": ["project-priority"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "project-name-regex",
+    "template-directory",
+    "remove-on-failure",
+    "global-startup",
+    "global-teardown",
+    "user-preferences"
+  ],
+  "additionalProperties": false
+}
